@@ -75,21 +75,20 @@ void identify_microphones() {
     }
     uint16_t average = sum / NUM_MIC_ID_AVERAGE_POINTS;
     
-    int closest_average = -1;
-    uint16_t closest_average_difference = 0;
+    int mic_no = -1;
     for (int i = 0; i < NUM_INPUTS; i++) {
       uint16_t difference = abs(microphone_averages[i] - average);
-      if (difference > closest_average_difference) {
-        closest_average_difference = difference;
-        closest_average = i;
+      if (difference < 50) {
+        mic_no = i;
+        break;
       }
     }
     
-    mic_to_input_number[closest_average] = input;
-    input_to_mic_number[input] = closest_average;
+    mic_to_input_number[mic_no] = input;
+    input_to_mic_number[input] = mic_no;
     Serial.print("i"); Serial.print(input);
     Serial.print(" (average "); Serial.print(average);
-    Serial.print(") -> m"); Serial.println(closest_average);
+    Serial.print(") -> m"); Serial.println(mic_no);
   }
   
   Serial.println("Microphones identified.");
