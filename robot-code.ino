@@ -1,24 +1,18 @@
-#define   SMP_RATE          48000UL
-#define   CLK_MAIN       84000000UL
-#define   TMR_CNTR       CLK_MAIN / (2 *SMP_RATE)
+#define SMP_RATE          48000UL
+#define CLK_MAIN       84000000UL
+#define TMR_CNTR       CLK_MAIN / (2 *SMP_RATE)
 
-#define   INP_BUFF       3072
+#define INP_BUFF       3072
 
-volatile  int16_t   flag              =   0 ;
+volatile int16_t flag = 0 ;
 
-uint16_t  inp[INP_BUFF]   = { 0};     // DMA likes ping-pongs buffer
+uint16_t inp[INP_BUFF] = {0};     // DMA likes ping-pongs buffer
 
-void setup()
-{
-  Serial.begin (115200) ;
-  adc_setup ();
-  tmr_setup ();
-  pio_TIOA0 ();  // drive Arduino pin 2 at SMPL_RATE to bring clock out
-}
-
-inline int mult_shft12( int a, int b)
-{
-  return (( a  *  b )  >> 12);
+void setup() {
+  Serial.begin(115200);
+  adc_setup();
+  tmr_setup();
+  pio_TIOA0();  // drive Arduino pin 2 at SMPL_RATE to bring clock out
 }
 
 void loop() {
@@ -36,15 +30,13 @@ void loop() {
   }
 }
 
-void pio_TIOA0 ()  // Configure Ard pin 2 as output from TC0 channel A (copy of trigger event)
-{
+void pio_TIOA0() { // Configure Ard pin 2 as output from TC0 channel A (copy of trigger event)
   PIOB->PIO_PDR = PIO_PB25B_TIOA0 ;  // disable PIO control
   PIOB->PIO_IDR = PIO_PB25B_TIOA0 ;   // disable PIO interrupts
   PIOB->PIO_ABSR |= PIO_PB25B_TIOA0 ;  // switch to B peripheral
 }
 
-void tmr_setup ()
-{
+void tmr_setup() {
   pmc_enable_periph_clk(TC_INTERFACE_ID + 0 * 3 + 0); // clock the TC0 channel 0
 
   TcChannel * t = &(TC0->TC_CHANNEL)[0] ;            // pointer to TC0 registers for its channel 0
@@ -64,20 +56,19 @@ void tmr_setup ()
   t->TC_CCR = TC_CCR_CLKEN | TC_CCR_SWTRG ;  // re-enable local clocking and switch to hardware trigger source.
 }
 
-void adc_setup ()
-{
+void adc_setup() {
   pmc_enable_periph_clk(ID_ADC);
   adc_init(ADC, SystemCoreClock, ADC_FREQ_MAX, ADC_STARTUP_FAST);
-  NVIC_EnableIRQ (ADC_IRQn);               // enable ADC interrupt vector
+  NVIC_EnableIRQ(ADC_IRQn);               // enable ADC interrupt vector
 
   adc_disable_all_channel(ADC);
   adc_enable_interrupt(ADC, ADC_IER_RXBUFF);
 
-  ADC->ADC_RPR  =  (uint32_t)  inp;      // DMA buffer
-  ADC->ADC_RCR  =  INP_BUFF;
-  ADC->ADC_RNPR =  (uint32_t)  inp;      // next DMA buffer
-  ADC->ADC_RNCR =  INP_BUFF;
-  ADC->ADC_PTCR =  1;
+  ADC->ADC_RPR  = (uint32_t) inp;      // DMA buffer
+  ADC->ADC_RCR  = INP_BUFF;
+  ADC->ADC_RNPR = (uint32_t) inp;      // next DMA buffer
+  ADC->ADC_RNCR = INP_BUFF;
+  ADC->ADC_PTCR = 1;
 
   adc_set_bias_current(ADC, 0x01);
   //  adc_enable_tag(ADC);
@@ -88,11 +79,10 @@ void adc_setup ()
   adc_start(ADC);
 }
 
-void ADC_Handler (void)
-{
+void ADC_Handler(void) {
   if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) {
     flag = 1;
-    ADC->ADC_RNPR  =  (uint32_t)  inp;
-    ADC->ADC_RNCR  =  INP_BUFF;
+    ADC->ADC_RNPR = (uint32_t) inp;
+    ADC->ADC_RNCR = INP_BUFF;
   }
 }
