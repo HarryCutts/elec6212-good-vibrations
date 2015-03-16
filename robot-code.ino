@@ -4,11 +4,17 @@
 
 #define NUM_INPUTS     3
 
+#define NUM_MIC_ID_AVERAGE_POINTS 10
+
 #define MEASUREMENTS_PER_BUFF 1024
 #define INP_BUFF       (MEASUREMENTS_PER_BUFF * NUM_INPUTS)
 
-const uint8_t input_buffer_offsets[] = {1, 2, 0};
-const uint8_t input_thresholds[] = {3072, 3072, 3072};
+const uint16_t microphone_averages[] = {1400, 1500, 1600};
+const uint16_t microphone_thresholds[] = {1500, 1600, 1700};
+
+uint8_t mic_to_input_number[NUM_INPUTS];
+uint8_t input_to_mic_number[NUM_INPUTS];
+bool have_identified_microphones = false;
 
 volatile int16_t flag = 0 ;
 
@@ -25,17 +31,25 @@ void setup() {
   buffer_end_time = micros();
 }
 
+int mic_id_counter = 0;
+
 void loop() {
   if (flag) {
+    if (!have_identified_microphones) {
+      mic_id_counter++;
+      if (mic_id_counter == 5) identify_microphones();
+    } 
+    
     unsigned long buffer_duration = buffer_end_time - buffer_start_time;
     for (uint8_t input = 0; input < NUM_INPUTS; input++) {
+      uint16_t threshold = microphone_thresholds[input_to_mic_number[input]];
       bool crossed_threshold = false;
       size_t crossing_index;
       
-      for (size_t i = input_buffer_offsets[input]; i < INP_BUFF; i += NUM_INPUTS) {
-        if (inp[i] >= input_thresholds[input]) {
+      for (size_t i = mic_to_input_number[input]; i < INP_BUFF; i += NUM_INPUTS) {
+        if (inp[i] >= threshold) {
           crossed_threshold = true;
-          crossing_index = (i - input_buffer_offsets[input]) / NUM_INPUTS;
+          crossing_index = (i - mic_to_input_number[input]) / NUM_INPUTS;
           break;
         }
       }
@@ -43,7 +57,7 @@ void loop() {
       if (crossed_threshold) {
         float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
         unsigned long crossing_time = buffer_start_time + (long)(buffer_duration * fraction_of_buffer);
-        Serial.print("Input "); Serial.print(input); Serial.print(" crossed at "); Serial.println(crossing_time);
+        Serial.print("m"); Serial.print(input_to_mic_number[input]); Serial.print(" crossed at "); Serial.println(crossing_time);
       }
     }
 
@@ -51,6 +65,35 @@ void loop() {
 
     flag = 0;
   }
+}
+
+void identify_microphones() {
+  for (uint8_t input = 0; input < NUM_INPUTS; input++) {
+    uint16_t sum = 0;
+    for (size_t i = input; i < NUM_MIC_ID_AVERAGE_POINTS * NUM_INPUTS; i += NUM_INPUTS) {
+      sum += inp[i];
+    }
+    uint16_t average = sum / NUM_MIC_ID_AVERAGE_POINTS;
+    
+    int closest_average = -1;
+    uint16_t closest_average_difference = 0;
+    for (int i = 0; i < NUM_INPUTS; i++) {
+      uint16_t difference = abs(microphone_averages[i] - average);
+      if (difference > closest_average_difference) {
+        closest_average_difference = difference;
+        closest_average = i;
+      }
+    }
+    
+    mic_to_input_number[closest_average] = input;
+    input_to_mic_number[input] = closest_average;
+    Serial.print("i"); Serial.print(input);
+    Serial.print(" (average "); Serial.print(average);
+    Serial.print(") -> m"); Serial.println(closest_average);
+  }
+  
+  Serial.println("Microphones identified.");
+  have_identified_microphones = true;
 }
 
 void print_data() {
