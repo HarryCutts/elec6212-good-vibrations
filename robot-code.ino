@@ -17,12 +17,14 @@ void setup() {
 
 void loop() {
   if (flag) {
-    Serial.print("DATA: ");
-    for (uint32_t i = 0; i < 12; i++) {
+    Serial.println("DATA: ");d
+    for (size_t i = 0; i < INP_BUFF; i += 3) {
       Serial.print(inp[i]);
-      Serial.print(" ");
+      Serial.print("\t");
+      Serial.print(inp[i+1]);
+      Serial.print("\t");
+      Serial.println(inp[i+2]);
     }
-    Serial.println();
 
     // A2 A0 A1
 
