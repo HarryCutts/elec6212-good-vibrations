@@ -2,32 +2,64 @@
 #define CLK_MAIN       84000000UL
 #define TMR_CNTR       CLK_MAIN / (2 *SMP_RATE)
 
-#define INP_BUFF       3072
+#define NUM_INPUTS     3
+
+#define MEASUREMENTS_PER_BUFF 1024
+#define INP_BUFF       (MEASUREMENTS_PER_BUFF * NUM_INPUTS)
+
+const uint8_t input_buffer_offsets[] = {1, 2, 0};
+const uint8_t input_thresholds[] = {3072, 3072, 3072};
 
 volatile int16_t flag = 0 ;
 
 uint16_t inp[INP_BUFF] = {0};     // DMA likes ping-pongs buffer
+unsigned long buffer_start_time, buffer_end_time;
+  // The times at which the first and last measurements in the buffer
+  // were taken, in microseconds.
 
 void setup() {
   Serial.begin(115200);
   adc_setup();
   tmr_setup();
   pio_TIOA0();  // drive Arduino pin 2 at SMPL_RATE to bring clock out
+  buffer_end_time = micros();
 }
 
 void loop() {
   if (flag) {
-    Serial.print("DATA: ");
-    for (uint32_t i = 0; i < 12; i++) {
-      Serial.print(inp[i]);
-      Serial.print(" ");
+    unsigned long buffer_duration = buffer_end_time - buffer_start_time;
+    for (uint8_t input = 0; input < NUM_INPUTS; input++) {
+      bool crossed_threshold = false;
+      size_t crossing_index;
+      
+      for (size_t i = input_buffer_offsets[input]; i < INP_BUFF; i += NUM_INPUTS) {
+        if (inp[i] >= input_thresholds[input]) {
+          crossed_threshold = true;
+          crossing_index = (i - input_buffer_offsets[input]) / NUM_INPUTS;
+          break;
+        }
+      }
+      
+      if (crossed_threshold) {
+        float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
+        unsigned long crossing_time = buffer_start_time + (long)(buffer_duration * fraction_of_buffer);
+        Serial.print("Input "); Serial.print(input); Serial.print(" crossed at "); Serial.println(crossing_time);
+      }
     }
-    Serial.println();
 
     // A2 A0 A1
 
     flag = 0;
   }
+}
+
+void print_data() {
+  Serial.print("DATA: ");
+  for (uint32_t i = 0; i < 12; i++) {
+    Serial.print(inp[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
 }
 
 void pio_TIOA0() { // Configure Ard pin 2 as output from TC0 channel A (copy of trigger event)
@@ -81,6 +113,8 @@ void adc_setup() {
 
 void ADC_Handler(void) {
   if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) {
+    buffer_start_time = buffer_end_time;
+    buffer_end_time = micros();
     flag = 1;
     ADC->ADC_RNPR = (uint32_t) inp;
     ADC->ADC_RNCR = INP_BUFF;
