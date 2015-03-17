@@ -1,16 +1,18 @@
-#define SMP_RATE          48000UL
-#define CLK_MAIN       84000000UL
-#define TMR_CNTR       CLK_MAIN / (2 *SMP_RATE)
+const unsigned long SAMPLE_RATE =    48000UL;
+const unsigned long CLOCK_MAIN  = 84000000UL;
+#define TMR_CNTR (CLOCK_MAIN / (2 * SAMPLE_RATE))
 
-#define NUM_INPUTS     3
+const uint16_t NUM_INPUTS = 3;
 
-#define NUM_MIC_ID_AVERAGE_POINTS 10
+const uint16_t NUM_MIC_ID_AVERAGE_POINTS = 10;
+  // The number of data points to average when identifying microphones
 
-#define MEASUREMENTS_PER_BUFF 1024
-#define INP_BUFF       (MEASUREMENTS_PER_BUFF * NUM_INPUTS)
+const uint16_t MEASUREMENTS_PER_BUFF = 1024;
+  // The number of measurements *from each sensor* to store in the buffer
+const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFF * NUM_INPUTS;
 
-const uint16_t microphone_averages[] = {1400, 1500, 1600};
-const uint16_t microphone_thresholds[] = {1500, 1600, 1700};
+const uint16_t microphone_averages[NUM_INPUTS] = {1400, 1500, 1600};
+const uint16_t microphone_thresholds[NUM_INPUTS] = {1500, 1600, 1700};
 
 uint8_t mic_to_input_number[NUM_INPUTS];
 uint8_t input_to_mic_number[NUM_INPUTS];
