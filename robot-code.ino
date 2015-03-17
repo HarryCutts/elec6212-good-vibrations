@@ -44,6 +44,7 @@ void loop() {
     } 
     
     unsigned long buffer_duration = buffer_end_time - buffer_start_time;
+    Serial.print(buffer_duration); Serial.print(",");
     for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
       uint16_t threshold = microphone_thresholds[mic_no];
       bool crossed_threshold = false;
@@ -66,6 +67,8 @@ void loop() {
 
     // A2 A0 A1
 
+    unsigned long processing_time = micros() - buffer_start_time;
+    Serial.println(processing_time);
     data_to_process = false;
   }
 }
