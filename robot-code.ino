@@ -16,7 +16,7 @@ uint8_t mic_to_input_number[NUM_INPUTS];
 uint8_t input_to_mic_number[NUM_INPUTS];
 bool have_identified_microphones = false;
 
-volatile int16_t flag = 0 ;
+volatile bool data_to_process = false;
 
 uint16_t inp[INP_BUFF] = {0};     // DMA likes ping-pongs buffer
 unsigned long buffer_start_time, buffer_end_time;
@@ -34,7 +34,7 @@ void setup() {
 int mic_id_counter = 0;
 
 void loop() {
-  if (flag) {
+  if (data_to_process) {
     if (!have_identified_microphones) {
       mic_id_counter++;
       if (mic_id_counter == 5) identify_microphones();
@@ -63,7 +63,7 @@ void loop() {
 
     // A2 A0 A1
 
-    flag = 0;
+    data_to_process = false;
   }
 }
 
@@ -157,7 +157,7 @@ void ADC_Handler(void) {
   if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) {
     buffer_start_time = buffer_end_time;
     buffer_end_time = micros();
-    flag = 1;
+    data_to_process = true;
     ADC->ADC_RNPR = (uint32_t) inp;
     ADC->ADC_RNCR = INP_BUFF;
   }
