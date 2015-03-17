@@ -44,15 +44,15 @@ void loop() {
     } 
     
     unsigned long buffer_duration = buffer_end_time - buffer_start_time;
-    for (uint8_t input = 0; input < NUM_INPUTS; input++) {
-      uint16_t threshold = microphone_thresholds[input_to_mic_number[input]];
+    for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
+      uint16_t threshold = microphone_thresholds[mic_no];
       bool crossed_threshold = false;
       size_t crossing_index;
       
-      for (size_t i = mic_to_input_number[input]; i < INP_BUFF; i += NUM_INPUTS) {
+      for (size_t i = mic_to_input_number[mic_no]; i < INP_BUFF; i += NUM_INPUTS) {
         if (inp[i] >= threshold) {
           crossed_threshold = true;
-          crossing_index = (i - mic_to_input_number[input]) / NUM_INPUTS;
+          crossing_index = (i - mic_to_input_number[mic_no]) / NUM_INPUTS;
           break;
         }
       }
@@ -60,7 +60,7 @@ void loop() {
       if (crossed_threshold) {
         float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
         unsigned long crossing_time = buffer_start_time + (long)(buffer_duration * fraction_of_buffer);
-        Serial.print("m"); Serial.print(input_to_mic_number[input]); Serial.print(" crossed at "); Serial.println(crossing_time);
+        Serial.print("m"); Serial.print(mic_no); Serial.print(" crossed at "); Serial.println(crossing_time);
       }
     }
 
