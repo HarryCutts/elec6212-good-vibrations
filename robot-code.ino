@@ -1,3 +1,5 @@
+#undef SHOW_TIMINGS
+
 const unsigned long SAMPLE_RATE =    48000UL;
 const unsigned long CLOCK_MAIN  = 84000000UL;
 #define TMR_CNTR (CLOCK_MAIN / (2 * SAMPLE_RATE))
@@ -44,7 +46,9 @@ void loop() {
     } 
     
     unsigned long buffer_duration = buffer_end_time - buffer_start_time;
-    Serial.print(buffer_duration); Serial.print(",");
+    #ifdef SHOW_TIMINGS
+      Serial.print(buffer_duration); Serial.print(",");
+    #endif
     for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
       uint16_t threshold = microphone_thresholds[mic_no];
       bool crossed_threshold = false;
@@ -67,8 +71,10 @@ void loop() {
 
     // A2 A0 A1
 
-    unsigned long processing_time = micros() - buffer_start_time;
-    Serial.println(processing_time);
+    #ifdef SHOW_TIMINGS
+      unsigned long processing_time = micros() - buffer_start_time;
+      Serial.println(processing_time);
+    #endif
     data_to_process = false;
   }
 }
