@@ -36,6 +36,7 @@ int mic_id_counter = 0;
 void loop() {
   if (data_to_process) {
     if (!have_identified_microphones) {
+      // The analogue inputs take a while to "warm up"
       mic_id_counter++;
       if (mic_id_counter == 5) identify_microphones();
     } 
@@ -154,11 +155,13 @@ void adc_setup() {
 }
 
 void ADC_Handler(void) {
-  if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) {
+  if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) { // If the buffer is full
     buffer_start_time = buffer_end_time;
     buffer_end_time = micros();
     data_to_process = true;
-    ADC->ADC_RNPR = (uint32_t) inp;
+
+    // Instruct the DMA to copy into `inp`
+    ADC->ADC_RNPR = (uint32_t)inp;
     ADC->ADC_RNCR = INP_BUFF;
   }
 }
