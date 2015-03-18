@@ -33,6 +33,7 @@ typedef struct {
 } InputBuffer;
 
 void identify_microphones(InputBuffer &buff);
+void dump_buffer(InputBuffer &buff);
 void process_data(InputBuffer &buff);
 
 volatile bool data_to_process = false;
@@ -118,12 +119,20 @@ void process_tap(unsigned long (&times)[NUM_INPUTS]) {
   
   Serial.print("Tap: ");
   for (size_t i = 0; i < NUM_INPUTS; i++) {
-      Serial.print(times[i]); Serial.print(",");
+      Serial.print(times[i]); Serial.print("\t");
   }
-  Serial.print(". Angle (degrees): ");
-  Serial.print(angle);
-  Serial.print(" ");
-  Serial.println(angle * 180 / M_PI);
+  Serial.print("\t");
+  Serial.println(angle);
+}
+
+void dump_buffer(InputBuffer &buff) {
+  for (size_t row = 0; row < INP_BUFF; row += NUM_INPUTS) {
+    for (size_t column = 0; column < NUM_INPUTS; column++) {
+      Serial.print(buff.data[row + column]);
+      Serial.print(',');
+    }
+    Serial.println();
+  }
 }
 
 void process_data(InputBuffer &buff) {
@@ -152,6 +161,7 @@ void process_data(InputBuffer &buff) {
   }
 
   if (all_non_zero(trigger_times)) {
+    dump_buffer(buff);
     process_tap(trigger_times);
   }
 }
