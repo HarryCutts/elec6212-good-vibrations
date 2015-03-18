@@ -99,11 +99,27 @@ void identify_microphones(InputBuffer &buff) {
   have_identified_microphones = true;
 }
 
+bool all_non_zero(unsigned long (&values)[NUM_INPUTS]) {
+  for (size_t i = 0; i < NUM_INPUTS; i++) {
+    if (values[i] == 0) return false;
+  }
+  return true;
+}
+
+void process_tap(unsigned long (&times)[NUM_INPUTS]) {
+  Serial.print("Tap: ");
+  for (size_t i = 0; i < NUM_INPUTS; i++) {
+      Serial.print(times[i]); Serial.print(",");
+  }
+  Serial.println();
+}
+
 void process_data(InputBuffer &buff) {
   unsigned long buffer_duration = buff.end_time - buff.start_time;
   #ifdef SHOW_TIMINGS
     Serial.print(buffer_duration); Serial.print(",");
   #endif
+  unsigned long trigger_times[NUM_INPUTS] = {0};
   for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
     uint16_t threshold = microphone_thresholds[mic_no];
     bool crossed_threshold = false;
@@ -119,9 +135,12 @@ void process_data(InputBuffer &buff) {
 
     if (crossed_threshold) {
       float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
-      unsigned long crossing_time = buff.start_time + (long)(buffer_duration * fraction_of_buffer);
-      Serial.print("m"); Serial.print(mic_no); Serial.print(" crossed at "); Serial.println(crossing_time);
+      trigger_times[mic_no] = buff.start_time + (long)(buffer_duration * fraction_of_buffer);
     }
+  }
+
+  if (all_non_zero(trigger_times)) {
+    process_tap(trigger_times);
   }
 }
 
