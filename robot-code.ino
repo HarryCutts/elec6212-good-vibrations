@@ -137,17 +137,17 @@ void process_data(InputBuffer &buff) {
   unsigned long trigger_times[NUM_INPUTS] = {0};
   for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
     uint16_t threshold = microphone_thresholds[mic_no];
-    bool crossed_threshold = false;
-    size_t crossing_index;
+    size_t trigger_index;
+    uint16_t max_so_far = 0;
 
     for (size_t i = mic_to_input_number[mic_no]; i < INP_BUFF; i += NUM_INPUTS) {
-      if (buff.data[i] >= threshold) {
-        crossed_threshold = true;
-        crossing_index = (i - mic_to_input_number[mic_no]) / NUM_INPUTS;
-        break;
+      if (buff.data[i] >= max_so_far) {
+        max_so_far = buff.data[i];
+        trigger_index = (i - mic_to_input_number[mic_no]) / NUM_INPUTS;
       }
     }
 
+    bool crossed_threshold = (max_so_far >= threshold);
     if (crossed_threshold) {
       float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
       trigger_times[mic_no] = buff.start_time + (long)(buffer_duration * fraction_of_buffer);
