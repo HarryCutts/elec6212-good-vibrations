@@ -1,10 +1,15 @@
+#include <math.h>
+
 #undef SHOW_TIMINGS
 
 const unsigned long SAMPLE_RATE =    48000UL;
 const unsigned long CLOCK_MAIN  = 84000000UL;
 #define TMR_CNTR (CLOCK_MAIN / (2 * SAMPLE_RATE))
 
-const uint16_t NUM_INPUTS = 3;
+const uint16_t NUM_INPUTS = 4;
+const uint16_t microphone_averages[NUM_INPUTS]   = {1500, 1600, 1700, 1800};
+const uint16_t microphone_thresholds[NUM_INPUTS] = {1600, 1700, 1800, 1900};
+  // Also update adc_setup method
 
 const uint16_t NUM_MIC_ID_AVERAGE_POINTS = 10;
   // The number of data points to average when identifying microphones
@@ -14,9 +19,6 @@ const uint8_t NUM_BUFFERS = 2;
 const uint16_t MEASUREMENTS_PER_BUFF = 1024;
   // The number of measurements *from each sensor* to store in the buffer
 const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFF * NUM_INPUTS;
-
-const uint16_t microphone_averages[NUM_INPUTS] = {1400, 1500, 1600};
-const uint16_t microphone_thresholds[NUM_INPUTS] = {1500, 1600, 1700};
 
 uint8_t mic_to_input_number[NUM_INPUTS];
 uint8_t input_to_mic_number[NUM_INPUTS];
@@ -110,11 +112,21 @@ bool all_non_zero(unsigned long (&values)[NUM_INPUTS]) {
 }
 
 void process_tap(unsigned long (&times)[NUM_INPUTS]) {
+  float angle;
+  if (abs(times[3] - times[1]) >= abs(times[2] - times[0])) {
+    angle = atan2(times[3] - times[1], times[2] - times[0]);
+  } else {
+    angle = atan2(times[2] - times[0], times[1] - times[3]) - M_PI_2;
+  }
+  
   Serial.print("Tap: ");
   for (size_t i = 0; i < NUM_INPUTS; i++) {
       Serial.print(times[i]); Serial.print(",");
   }
-  Serial.println();
+  Serial.print(". Angle (degrees): ");
+  Serial.print(angle);
+  Serial.print(" ");
+  Serial.println(angle * 180 / M_PI);
 }
 
 void process_data(InputBuffer &buff) {
@@ -192,6 +204,7 @@ void adc_setup() {
   adc_enable_channel(ADC, ADC_CHANNEL_7);  // AN0
   adc_enable_channel(ADC, ADC_CHANNEL_6);  // AN1
   adc_enable_channel(ADC, ADC_CHANNEL_5);  // AN2
+  adc_enable_channel(ADC, ADC_CHANNEL_4);  // AN3
   adc_configure_trigger(ADC, ADC_TRIG_TIO_CH_0, 0);
   adc_start(ADC);
 }
