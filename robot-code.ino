@@ -60,11 +60,14 @@ void loop() {
       if (mic_id_counter == 5) identify_microphones(buff);
     }
 
+    #ifdef SHOW_TIMINGS
+      unsigned long timing_proc_start_time = micros();
+    #endif
+
     process_data(buff);
 
     #ifdef SHOW_TIMINGS
-      unsigned long processing_time = micros() - data_start_time;
-      Serial.println(processing_time);
+      Serial.println(micros() - timing_proc_start_time);
     #endif
 
     data_to_process = false;
