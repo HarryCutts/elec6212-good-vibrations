@@ -9,6 +9,8 @@ const uint16_t NUM_INPUTS = 3;
 const uint16_t NUM_MIC_ID_AVERAGE_POINTS = 10;
   // The number of data points to average when identifying microphones
 
+const uint8_t NUM_BUFFERS = 2;
+
 const uint16_t MEASUREMENTS_PER_BUFF = 1024;
   // The number of measurements *from each sensor* to store in the buffer
 const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFF * NUM_INPUTS;
@@ -20,70 +22,60 @@ uint8_t mic_to_input_number[NUM_INPUTS];
 uint8_t input_to_mic_number[NUM_INPUTS];
 bool have_identified_microphones = false;
 
-volatile bool data_to_process = false;
+typedef struct {
+  unsigned long start_time, end_time;
+    // The times at which the first and last measurements in the buffer
+    // were taken, in microseconds.
 
-uint16_t inp[INP_BUFF] = {0};     // DMA likes ping-pongs buffer
-unsigned long buffer_start_time, buffer_end_time;
-  // The times at which the first and last measurements in the buffer
-  // were taken, in microseconds.
+  uint16_t data[INP_BUFF] = {0};     // DMA likes ping-pongs buffer
+} InputBuffer;
+
+void identify_microphones(InputBuffer &buff);
+void process_data(InputBuffer &buff);
+
+volatile bool data_to_process = false;
+volatile uint8_t write_buffer_index = 0, read_buffer_index = 0;
+
+InputBuffer buffers[NUM_BUFFERS];
+unsigned long data_start_time, data_end_time;
+  // The times at which the first and last measurements in the last buffer
+  // that was filled, in microseconds.
 
 void setup() {
   Serial.begin(115200);
   adc_setup();
   tmr_setup();
   pio_TIOA0();  // drive Arduino pin 2 at SMPL_RATE to bring clock out
-  buffer_end_time = micros();
+  data_end_time = micros();
 }
 
 int mic_id_counter = 0;
 
 void loop() {
   if (data_to_process) {
+    InputBuffer &buff = buffers[read_buffer_index];
     if (!have_identified_microphones) {
       // The analogue inputs take a while to "warm up"
       mic_id_counter++;
-      if (mic_id_counter == 5) identify_microphones();
-    } 
-    
-    unsigned long buffer_duration = buffer_end_time - buffer_start_time;
-    #ifdef SHOW_TIMINGS
-      Serial.print(buffer_duration); Serial.print(",");
-    #endif
-    for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
-      uint16_t threshold = microphone_thresholds[mic_no];
-      bool crossed_threshold = false;
-      size_t crossing_index;
-      
-      for (size_t i = mic_to_input_number[mic_no]; i < INP_BUFF; i += NUM_INPUTS) {
-        if (inp[i] >= threshold) {
-          crossed_threshold = true;
-          crossing_index = (i - mic_to_input_number[mic_no]) / NUM_INPUTS;
-          break;
-        }
-      }
-      
-      if (crossed_threshold) {
-        float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
-        unsigned long crossing_time = buffer_start_time + (long)(buffer_duration * fraction_of_buffer);
-        Serial.print("m"); Serial.print(mic_no); Serial.print(" crossed at "); Serial.println(crossing_time);
-      }
+      if (mic_id_counter == 5) identify_microphones(buff);
     }
 
-    // A2 A0 A1
+    process_data(buff);
 
     #ifdef SHOW_TIMINGS
-      unsigned long processing_time = micros() - buffer_start_time;
+      unsigned long processing_time = micros() - data_start_time;
       Serial.println(processing_time);
     #endif
+
     data_to_process = false;
   }
 }
 
-void identify_microphones() {
+void identify_microphones(InputBuffer &buff) {
   for (uint8_t input = 0; input < NUM_INPUTS; input++) {
     uint16_t sum = 0;
     for (size_t i = input; i < NUM_MIC_ID_AVERAGE_POINTS * NUM_INPUTS; i += NUM_INPUTS) {
-      sum += inp[i];
+      sum += buff.data[i];
     }
     uint16_t average = sum / NUM_MIC_ID_AVERAGE_POINTS;
     
@@ -107,13 +99,30 @@ void identify_microphones() {
   have_identified_microphones = true;
 }
 
-void print_data() {
-  Serial.print("DATA: ");
-  for (uint32_t i = 0; i < 12; i++) {
-    Serial.print(inp[i]);
-    Serial.print(" ");
+void process_data(InputBuffer &buff) {
+  unsigned long buffer_duration = buff.end_time - buff.start_time;
+  #ifdef SHOW_TIMINGS
+    Serial.print(buffer_duration); Serial.print(",");
+  #endif
+  for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
+    uint16_t threshold = microphone_thresholds[mic_no];
+    bool crossed_threshold = false;
+    size_t crossing_index;
+
+    for (size_t i = mic_to_input_number[mic_no]; i < INP_BUFF; i += NUM_INPUTS) {
+      if (buff.data[i] >= threshold) {
+        crossed_threshold = true;
+        crossing_index = (i - mic_to_input_number[mic_no]) / NUM_INPUTS;
+        break;
+      }
+    }
+
+    if (crossed_threshold) {
+      float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
+      unsigned long crossing_time = buff.start_time + (long)(buffer_duration * fraction_of_buffer);
+      Serial.print("m"); Serial.print(mic_no); Serial.print(" crossed at "); Serial.println(crossing_time);
+    }
   }
-  Serial.println();
 }
 
 void pio_TIOA0() { // Configure Ard pin 2 as output from TC0 channel A (copy of trigger event)
@@ -150,9 +159,9 @@ void adc_setup() {
   adc_disable_all_channel(ADC);
   adc_enable_interrupt(ADC, ADC_IER_RXBUFF);
 
-  ADC->ADC_RPR  = (uint32_t) inp;      // DMA buffer
+  ADC->ADC_RPR  = (uint32_t) buffers[0].data;      // DMA buffer
   ADC->ADC_RCR  = INP_BUFF;
-  ADC->ADC_RNPR = (uint32_t) inp;      // next DMA buffer
+  ADC->ADC_RNPR = (uint32_t) buffers[1].data;      // next DMA buffer
   ADC->ADC_RNCR = INP_BUFF;
   ADC->ADC_PTCR = 1;
 
@@ -167,12 +176,19 @@ void adc_setup() {
 
 void ADC_Handler(void) {
   if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) { // If the buffer is full
-    buffer_start_time = buffer_end_time;
-    buffer_end_time = micros();
-    data_to_process = true;
+    data_start_time = data_end_time;
+    data_end_time = micros();
+
+    InputBuffer &buff = buffers[write_buffer_index];
+    buff.start_time = data_start_time;
+    buff.end_time   = data_end_time;
 
     // Instruct the DMA to copy into `inp`
-    ADC->ADC_RNPR = (uint32_t)inp;
+    ADC->ADC_RNPR = (uint32_t)buff.data;
     ADC->ADC_RNCR = INP_BUFF;
+
+    read_buffer_index = write_buffer_index;
+    write_buffer_index = (write_buffer_index + 1) % NUM_BUFFERS;
+    data_to_process = true;
   }
 }
