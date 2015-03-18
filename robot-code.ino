@@ -108,11 +108,12 @@ bool all_non_zero(unsigned long (&values)[NUM_INPUTS]) {
 }
 
 void process_tap(unsigned long (&times)[NUM_INPUTS]) {
-  float angle;
-  if (abs(times[3] - times[1]) >= abs(times[2] - times[0])) {
-    angle = atan2(times[3] - times[1], times[2] - times[0]);
+  double angle;
+  signed long t1 = times[0], t2 = times[1], t3 = times[2], t4 = times[3];
+  if (abs(t4 - t2) >= abs(t3 - t1)) {
+    angle = atan2(t4 - t2, t3 - t1);
   } else {
-    angle = atan2(times[2] - times[0], times[1] - times[3]) - M_PI_2;
+    angle = atan2(t3 - t1, t2 - t4) - M_PI_2;
   }
   
   Serial.print("Tap: ");
