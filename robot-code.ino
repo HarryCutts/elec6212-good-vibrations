@@ -16,7 +16,7 @@ const uint16_t NUM_MIC_ID_AVERAGE_POINTS = 10;
 
 const uint8_t NUM_BUFFERS = 2;
 
-const uint16_t MEASUREMENTS_PER_BUFF = 1024;
+const uint16_t MEASUREMENTS_PER_BUFF = 2048;
   // The number of measurements *from each sensor* to store in the buffer
 const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFF * NUM_INPUTS;
 
