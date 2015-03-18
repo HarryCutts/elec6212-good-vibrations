@@ -7,8 +7,8 @@ const unsigned long CLOCK_MAIN  = 84000000UL;
 #define TMR_CNTR (CLOCK_MAIN / (2 * SAMPLE_RATE))
 
 const uint16_t NUM_INPUTS = 4;
-const uint16_t microphone_averages[NUM_INPUTS]   = {1500, 1600, 1700, 1800};
-const uint16_t microphone_thresholds[NUM_INPUTS] = {1600, 1700, 1800, 1900};
+const uint16_t microphone_averages[NUM_INPUTS]   = {1800, 1700, 1600, 1500}; //{1500, 1600, 1700, 1800};
+const uint16_t microphone_thresholds[NUM_INPUTS] = {1900, 1800, 1700, 1600}; //{1600, 1700, 1800, 1900};
   // Also update adc_setup method
 
 const uint16_t NUM_MIC_ID_AVERAGE_POINTS = 10;
