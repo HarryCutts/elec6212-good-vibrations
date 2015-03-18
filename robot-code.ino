@@ -155,8 +155,8 @@ void process_data(InputBuffer &buff) {
 
     bool crossed_threshold = (max_so_far >= threshold);
     if (crossed_threshold) {
-      float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
-      trigger_times[mic_no] = buff.start_time + (long)(buffer_duration * fraction_of_buffer);
+      //float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
+      trigger_times[mic_no] = trigger_index; //buff.start_time + (long)(buffer_duration * fraction_of_buffer);
     }
   }
 
