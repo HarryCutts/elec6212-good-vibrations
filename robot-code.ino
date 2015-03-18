@@ -95,12 +95,8 @@ void identify_microphones(InputBuffer &buff) {
     
     mic_to_input_number[mic_no] = input;
     input_to_mic_number[input] = mic_no;
-    Serial.print("i"); Serial.print(input);
-    Serial.print(" (average "); Serial.print(average);
-    Serial.print(") -> m"); Serial.println(mic_no);
   }
   
-  Serial.println("Microphones identified.");
   have_identified_microphones = true;
 }
 
