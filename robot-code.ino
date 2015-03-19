@@ -117,7 +117,7 @@ void process_tap(unsigned long (&times)[NUM_INPUTS]) {
     angle = atan2(t3 - t1, t2 - t4) - M_PI_2;
   }
   
-  Serial.print("Tap: ");
+  Serial.print("DEBUG: Tap ");
   for (size_t i = 0; i < NUM_INPUTS; i++) {
       Serial.print(times[i]); Serial.print("\t");
   }
@@ -126,6 +126,9 @@ void process_tap(unsigned long (&times)[NUM_INPUTS]) {
 }
 
 void dump_buffer(InputBuffer &buff) {
+  Serial.print("DEBUG: buffer at ");
+  uint16_t *addr = &buff.data[0];
+  Serial.println((unsigned int)addr);
   for (size_t row = 0; row < INP_BUFF; row += NUM_INPUTS) {
     for (size_t column = 0; column < NUM_INPUTS; column++) {
       Serial.print(buff.data[row + column]);
@@ -160,9 +163,13 @@ void process_data(InputBuffer &buff) {
     }
   }
 
+  Serial.println("DEBUG: Entering if statement");
   if (all_non_zero(trigger_times)) {
-    dump_buffer(buff);
+    Serial.println("DEBUG: All triggered");
     process_tap(trigger_times);
+    Serial.println("DEBUG: tap processed");
+    dump_buffer(buff);
+    Serial.println("End of data block");
   }
 }
 
