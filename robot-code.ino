@@ -192,9 +192,17 @@ void tmr_setup() {
   t->TC_CCR = TC_CCR_CLKEN | TC_CCR_SWTRG ;  // re-enable local clocking and switch to hardware trigger source.
 }
 
+void adc_enable_freerunning(Adc *p_adc, const enum adc_channel_num_t adc_ch) {
+  p_adc->ADC_MR |= 1 << adc_ch;
+}
+
 void adc_setup() {
   pmc_enable_periph_clk(ID_ADC);
   adc_init(ADC, SystemCoreClock, ADC_FREQ_MAX, ADC_STARTUP_FAST);
+  adc_enable_freerunning(ADC, ADC_CHANNEL_7);  // AN0
+  adc_enable_freerunning(ADC, ADC_CHANNEL_6);  // AN1
+  adc_enable_freerunning(ADC, ADC_CHANNEL_5);  // AN2
+  adc_enable_freerunning(ADC, ADC_CHANNEL_4);  // AN3
   NVIC_EnableIRQ(ADC_IRQn);               // enable ADC interrupt vector
 
   adc_disable_all_channel(ADC);
