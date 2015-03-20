@@ -16,13 +16,20 @@ const uint16_t NUM_MIC_ID_AVERAGE_POINTS = 10;
 
 const uint8_t NUM_BUFFERS = 2;
 
-const uint16_t MEASUREMENTS_PER_BUFF = 2048;
+const uint16_t MEASUREMENTS_PER_BUFFER = 2048;
   // The number of measurements *from each sensor* to store in the buffer
-const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFF * NUM_INPUTS;
+const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFFER * NUM_INPUTS;
 
 uint8_t mic_to_input_number[NUM_INPUTS];
 uint8_t input_to_mic_number[NUM_INPUTS];
 bool have_identified_microphones = false;
+
+typedef enum {
+  WAITING_FOR_CONNECTION,
+  SENDING_DATA
+} State;
+
+State state;
 
 typedef struct {
   unsigned long start_time, end_time;
@@ -35,6 +42,7 @@ typedef struct {
 void identify_microphones(InputBuffer &buff);
 void dump_buffer(InputBuffer &buff);
 void process_data(InputBuffer &buff);
+void serial_dump_buffer(InputBuffer &buff);
 
 volatile bool data_to_process = false;
 volatile uint8_t write_buffer_index = 0, read_buffer_index = 0;
@@ -45,16 +53,27 @@ unsigned long data_start_time, data_end_time;
   // that was filled, in microseconds.
 
 void setup() {
-  Serial.begin(115200);
-  adc_setup();
-  tmr_setup();
-  pio_TIOA0();  // drive Arduino pin 2 at SMPL_RATE to bring clock out
+  serial_init();
   data_end_time = micros();
+  state = WAITING_FOR_CONNECTION;
 }
 
 int mic_id_counter = 0;
 
 void loop() {
+  switch (state) {
+    case WAITING_FOR_CONNECTION:
+      if (serial_connection_ready()) {
+        adc_setup();
+        tmr_setup();
+        pio_TIOA0();  // drive Arduino pin 2 at SMPL_RATE to bring clock out
+        serial_send_size_header();
+        state = SENDING_DATA;
+      }
+      break;
+    case SENDING_DATA:
+      break;
+  }
   if (data_to_process) {
     InputBuffer &buff = buffers[read_buffer_index];
     if (!have_identified_microphones) {
@@ -67,7 +86,7 @@ void loop() {
       unsigned long timing_proc_start_time = micros();
     #endif
 
-    process_data(buff);
+    serial_dump_buffer(buff);
 
     #ifdef SHOW_TIMINGS
       Serial.println(micros() - timing_proc_start_time);
@@ -132,37 +151,6 @@ void dump_buffer(InputBuffer &buff) {
       Serial.print(',');
     }
     Serial.println();
-  }
-}
-
-void process_data(InputBuffer &buff) {
-  unsigned long buffer_duration = buff.end_time - buff.start_time;
-  #ifdef SHOW_TIMINGS
-    Serial.print(buffer_duration); Serial.print(",");
-  #endif
-  unsigned long trigger_times[NUM_INPUTS] = {0};
-  for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
-    uint16_t threshold = microphone_thresholds[mic_no];
-    size_t trigger_index;
-    uint16_t max_so_far = 0;
-
-    for (size_t i = mic_to_input_number[mic_no]; i < INP_BUFF; i += NUM_INPUTS) {
-      if (buff.data[i] >= max_so_far) {
-        max_so_far = buff.data[i];
-        trigger_index = (i - mic_to_input_number[mic_no]) / NUM_INPUTS;
-      }
-    }
-
-    bool crossed_threshold = (max_so_far >= threshold);
-    if (crossed_threshold) {
-      //float fraction_of_buffer = (float)crossing_index / (float)MEASUREMENTS_PER_BUFF;
-      trigger_times[mic_no] = trigger_index; //buff.start_time + (long)(buffer_duration * fraction_of_buffer);
-    }
-  }
-
-  if (all_non_zero(trigger_times)) {
-    dump_buffer(buff);
-    process_tap(trigger_times);
   }
 }
 
@@ -240,5 +228,64 @@ void ADC_Handler(void) {
     read_buffer_index = write_buffer_index;
     write_buffer_index = (write_buffer_index + 1) % NUM_BUFFERS;
     data_to_process = true;
+  }
+}
+
+////////////
+// Serial //
+////////////
+
+const unsigned long BAUD_RATE = 1000000;
+
+const uint8_t HOST_READY = 'r';
+const uint8_t HEADER_DATA_SIZE = 's';
+  // Sent at the start of the connection. Followed by:
+  // * the number of measurements per buffer (16 bits)
+  // * the number of inputs in the data (8 bits)
+
+const uint8_t BUFFER_START = 'b';
+  // Sent at the start of a buffer. Followed by:
+  // * the start time of the buffer (32 bits)
+  // * the end time of the buffer (32 bits)
+ 
+
+void write_uint16_t(uint16_t value) {
+  // TODO: check the endianness
+  for (int i = 0; i < 2; i++) {
+    SerialUSB.write((value >> (8 * i)) & 0xff);
+  }
+}
+
+void write_unsigned_long(unsigned long value) {
+  for (int i = 0; i < 4; i++) {
+    SerialUSB.write((value >> (8 * i)) & 0xff);
+  }
+}
+
+void serial_init() {
+  SerialUSB.begin(BAUD_RATE);
+}
+
+bool serial_connection_ready() {
+  if (SerialUSB.available() > 0) {
+    return SerialUSB.read() == HOST_READY;
+  } else {
+    return false;
+  }
+}
+
+void serial_send_size_header() {
+  // Tell the host what buffer sizes to expect
+  SerialUSB.write(HEADER_DATA_SIZE);
+  write_uint16_t(MEASUREMENTS_PER_BUFFER);
+  SerialUSB.write(NUM_INPUTS);
+}
+
+void serial_dump_buffer(InputBuffer &buff) {
+  SerialUSB.write(BUFFER_START);
+  write_unsigned_long(buff.start_time);
+  write_unsigned_long(buff.end_time);
+  for (int i = 0; i < INP_BUFF; i++) {
+    write_uint16_t(buff.data[i]);
   }
 }
