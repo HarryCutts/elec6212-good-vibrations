@@ -1,22 +1,23 @@
 #include <math.h>
 
-#undef SHOW_TIMINGS
+#define SHOW_TIMINGS
 
-const unsigned long SAMPLE_RATE =    48000UL;
+const unsigned long SAMPLE_RATE =    10000UL;
 const unsigned long CLOCK_MAIN  = 84000000UL;
 #define TMR_CNTR (CLOCK_MAIN / (2 * SAMPLE_RATE))
 
 const uint16_t NUM_INPUTS = 4;
-const uint16_t microphone_averages[NUM_INPUTS]   = {1800, 1700, 1600, 1500}; //{1500, 1600, 1700, 1800};
+const uint16_t microphone_averages[NUM_INPUTS]   = {1619, 1477, 1375, 1262}; //{1500, 1600, 1700, 1800};
+uint16_t microphone_averages_measured[NUM_INPUTS];
 const uint16_t microphone_thresholds[NUM_INPUTS] = {1900, 1800, 1700, 1600}; //{1600, 1700, 1800, 1900};
-  // Also update adc_setup method
+const uint8_t THRESHOLD = 100;
 
 const uint16_t NUM_MIC_ID_AVERAGE_POINTS = 10;
   // The number of data points to average when identifying microphones
 
 const uint8_t NUM_BUFFERS = 2;
 
-const uint16_t MEASUREMENTS_PER_BUFFER = 2048;
+const uint16_t MEASUREMENTS_PER_BUFFER = 2048*2;
   // The number of measurements *from each sensor* to store in the buffer
 const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFFER * NUM_INPUTS;
 
@@ -43,6 +44,7 @@ void identify_microphones(InputBuffer &buff);
 void dump_buffer(InputBuffer &buff);
 void process_data(InputBuffer &buff);
 void serial_dump_buffer(InputBuffer &buff);
+bool check_buffer_for_tap(InputBuffer &buff);
 
 volatile bool data_to_process = false;
 volatile uint8_t write_buffer_index = 0, read_buffer_index = 0;
@@ -75,22 +77,27 @@ void loop() {
       break;
   }
   if (data_to_process) {
+    unsigned long buffer_duration = data_end_time - data_start_time;
+    #ifdef SHOW_TIMINGS
+      Serial.println(buffer_duration);
+    #endif
+
     InputBuffer &buff = buffers[read_buffer_index];
     if (!have_identified_microphones) {
       // The analogue inputs take a while to "warm up"
       mic_id_counter++;
-      if (mic_id_counter == 5) identify_microphones(buff);
+      if (mic_id_counter >= 5){
+        identify_microphones(buff);
+        for (uint8_t mic_no = 0; mic_no < NUM_INPUTS; mic_no++) {
+          Serial.println(microphone_averages_measured[mic_no]);
+        }
+      }
     }
-
-    #ifdef SHOW_TIMINGS
-      unsigned long timing_proc_start_time = micros();
-    #endif
-
-    serial_dump_buffer(buff);
-
-    #ifdef SHOW_TIMINGS
-      Serial.println(micros() - timing_proc_start_time);
-    #endif
+    else{
+      if (check_buffer_for_tap(buff)){
+        serial_dump_buffer(buff);
+      }
+    }
 
     data_to_process = false;
   }
@@ -115,6 +122,7 @@ void identify_microphones(InputBuffer &buff) {
     
     mic_to_input_number[mic_no] = input;
     input_to_mic_number[input] = mic_no;
+    microphone_averages_measured[mic_no] = average;
   }
   
   have_identified_microphones = true;
@@ -187,10 +195,10 @@ void adc_enable_freerunning(Adc *p_adc, const enum adc_channel_num_t adc_ch) {
 void adc_setup() {
   pmc_enable_periph_clk(ID_ADC);
   adc_init(ADC, SystemCoreClock, ADC_FREQ_MAX, ADC_STARTUP_FAST);
-  adc_enable_freerunning(ADC, ADC_CHANNEL_7);  // AN0
-  adc_enable_freerunning(ADC, ADC_CHANNEL_6);  // AN1
-  adc_enable_freerunning(ADC, ADC_CHANNEL_5);  // AN2
-  adc_enable_freerunning(ADC, ADC_CHANNEL_4);  // AN3
+  // adc_enable_freerunning(ADC, ADC_CHANNEL_7);  // AN0
+  // adc_enable_freerunning(ADC, ADC_CHANNEL_6);  // AN1
+  // adc_enable_freerunning(ADC, ADC_CHANNEL_5);  // AN2
+  // adc_enable_freerunning(ADC, ADC_CHANNEL_4);  // AN3
   NVIC_EnableIRQ(ADC_IRQn);               // enable ADC interrupt vector
 
   adc_disable_all_channel(ADC);
@@ -214,19 +222,24 @@ void adc_setup() {
 
 void ADC_Handler(void) {
   if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) { // If the buffer is full
+    if (data_to_process==true){
+      Serial.println("Congestion. Last data has not been sent before next buffer was filled.");
+    }
+
     data_start_time = data_end_time;
     data_end_time = micros();
+
+    read_buffer_index = write_buffer_index;
+    write_buffer_index = (write_buffer_index + 1) % NUM_BUFFERS;
 
     InputBuffer &buff = buffers[write_buffer_index];
     buff.start_time = data_start_time;
     buff.end_time   = data_end_time;
 
-    // Instruct the DMA to copy into `inp`
+    //set the next write
     ADC->ADC_RNPR = (uint32_t)buff.data;
     ADC->ADC_RNCR = INP_BUFF;
 
-    read_buffer_index = write_buffer_index;
-    write_buffer_index = (write_buffer_index + 1) % NUM_BUFFERS;
     data_to_process = true;
   }
 }
@@ -235,7 +248,8 @@ void ADC_Handler(void) {
 // Serial //
 ////////////
 
-const unsigned long BAUD_RATE = 1000000;
+const unsigned long USB_BAUD_RATE = 1000000;
+const unsigned long BAUD_RATE = 115200;
 
 const uint8_t HOST_READY = 'r';
 const uint8_t HEADER_DATA_SIZE = 's';
@@ -247,7 +261,6 @@ const uint8_t BUFFER_START = 'b';
   // Sent at the start of a buffer. Followed by:
   // * the start time of the buffer (32 bits)
   // * the end time of the buffer (32 bits)
- 
 
 void write_uint16_t(uint16_t value) {
   // TODO: check the endianness
@@ -263,7 +276,8 @@ void write_unsigned_long(unsigned long value) {
 }
 
 void serial_init() {
-  SerialUSB.begin(BAUD_RATE);
+  SerialUSB.begin(USB_BAUD_RATE);
+  Serial.begin(BAUD_RATE);
 }
 
 bool serial_connection_ready() {
@@ -285,7 +299,25 @@ void serial_dump_buffer(InputBuffer &buff) {
   SerialUSB.write(BUFFER_START);
   write_unsigned_long(buff.start_time);
   write_unsigned_long(buff.end_time);
+    for (int i = 0; i < NUM_INPUTS; i++){
+    SerialUSB.write(input_to_mic_number[i]);
+    Serial.print("MICS: ");
+    Serial.print(input_to_mic_number[i]);
+    Serial.print("\n");
+  }
   for (int i = 0; i < INP_BUFF; i++) {
     write_uint16_t(buff.data[i]);
   }
+}
+
+bool check_buffer_for_tap(InputBuffer &buff) {
+  for (size_t i = 0; i < INP_BUFF; i += 1) {
+    int mic_no = input_to_mic_number[i%NUM_INPUTS];
+    if(abs(buff.data[i] - microphone_averages_measured[mic_no]) > THRESHOLD){
+      Serial.println(buff.data[i]);
+      have_identified_microphones=false;
+      return true;
+    }
+  }
+  return false;
 }
