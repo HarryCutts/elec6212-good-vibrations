@@ -27,6 +27,12 @@ def combine_two_bytes(d):
     return d[0] | d[1] << 8
 
 
+def order_microphones(block):
+    """Returns the block with the microphones sorted by their averages."""
+    averages = np.mean(block, axis=1)
+    return block[np.argsort(averages)]
+
+
 def read_block(ser):
     block = [[] for i in range(NUM_INPUTS)]
     for y in range(MEASUREMENTS_PER_BUFFER):
@@ -34,7 +40,7 @@ def read_block(ser):
             num = combine_two_bytes(ser.read(size=2))
             block[mic].append(num)
 
-    return np.array(block)
+    return order_microphones(np.array(block))
 
 
 def get_data(num_blocks):
