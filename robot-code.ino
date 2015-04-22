@@ -1,4 +1,6 @@
-const unsigned long SAMPLE_RATE =    100000UL;
+#undef TIMING
+
+const unsigned long SAMPLE_RATE =    150000UL;
 const unsigned long CLOCK_MAIN  = 84000000UL;
 #define TMR_CNTR (CLOCK_MAIN / (2 * SAMPLE_RATE))
 
@@ -11,7 +13,8 @@ const uint16_t INP_BUFF = MEASUREMENTS_PER_BUFFER * NUM_INPUTS;
 uint16_t data[INP_BUFF] = {0};     // DMA likes ping-pongs buffer
 
 void setup() {
-  SerialUSB.begin(10000000);  
+  SerialUSB.begin(10000000);
+  Serial.begin(115200);
   adc_setup();
   tmr_setup();
   pio_TIOA0();  // drive Arduino pin 2 at SMPL_RATE to bring clock out
@@ -85,8 +88,15 @@ void write_uint16_t(uint16_t value) {
   }
 }
 
+#ifdef TIMING
+unsigned long sampling_period_start;
+#endif
+
 void ADC_Handler(void) {
   if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) { // If the buffer is full
+    #ifdef TIMING
+	Serial.println(micros() - sampling_period_start);
+	#endif
 
     int maxs[NUM_INPUTS] = {0,0,0,0};
     int mins[NUM_INPUTS] = {2048,2048,2048,2048};
@@ -113,10 +123,13 @@ void ADC_Handler(void) {
         write_uint16_t(data[i]);
       }
     }
-    
+
     //set the next write
     ADC->ADC_RNPR = (uint32_t)data;
     ADC->ADC_RNCR = INP_BUFF;
 
+    #ifdef TIMING
+    sampling_period_start = micros();
+    #endif
   }
 }
