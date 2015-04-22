@@ -1,45 +1,65 @@
 from __future__ import division, print_function
 
+import argparse
 import sys
 import serial
-import numpy as np
-import matplotlib.pyplot as plt
 import time
 
-BAUD_RATE = 1000000
+import numpy as np
+import matplotlib.pyplot as plt
 
-port = sys.argv[1]
+BAUD_RATE = 1000000
+MEASUREMENTS_PER_BUFFER = 2048 * 4
+NUM_INPUTS = 4
+
+parser = argparse.ArgumentParser()
+parser.add_argument('port', type=str,
+        help="The location of the Arduino's Native USB port")
+parser.add_argument('--num-blocks', type=int, default=2,
+        help="The number of blocks to acquire and plot")
+args = parser.parse_args()
+
+port = args.port
 
 ser = serial.Serial(baudrate=BAUD_RATE)
 
-totaldata = [[0] for i in range(4)]
+def combine_two_bytes(d):
+    return d[0] | d[1] << 8
 
-mic = 0
 
-try:
-    ser.setPort(port)
-    ser.open()
+def read_block(ser):
+    block = [[] for i in range(NUM_INPUTS)]
+    for y in range(MEASUREMENTS_PER_BUFFER):
+        for mic in range(NUM_INPUTS):
+            num = combine_two_bytes(ser.read(size=2))
+            block[mic].append(num)
 
-    for block_number in range(5):
-        print("Next Block")
-        for y in range(2048*4*4):
-            while ser.inWaiting() == 0:
-                pass
+    return np.array(block)
 
-            d = ser.read(size=2)
-            num = d[0] | d[1] << 8
-            print(str(mic) + " -> " + str(num))
 
-            totaldata[mic].append(num)
+def get_data(num_blocks):
+    try:
+        ser.setPort(port)
+        ser.open()
 
-            mic = (mic + 1) % 4
-        #print(np.array(data).mean(axis=1))
+        data = None
 
-finally:
-    ser.close()
+        for block_number in range(num_blocks):
+            print("Next block")
+            block = read_block(ser)
+            data = np.concatenate((data, block), axis=1) if data is not None else block
 
-plt.plot(totaldata[0])
-plt.plot(totaldata[1])
-plt.plot(totaldata[2])
-plt.plot(totaldata[3])
-plt.show()
+        return data
+
+    finally:
+        ser.close()
+
+
+def plot_data(data):
+    for mic in range(NUM_INPUTS):
+        plt.plot(data[mic])
+
+    plt.show()
+
+
+plot_data(get_data(args.num_blocks))
