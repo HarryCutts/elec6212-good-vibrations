@@ -1,5 +1,7 @@
 #undef TIMING
 
+const int ADC_MAX = 4096;
+
 const unsigned long SAMPLE_RATE =    150000UL;
 const unsigned long CLOCK_MAIN  = 84000000UL;
 #define TMR_CNTR (CLOCK_MAIN / (2 * SAMPLE_RATE))
@@ -99,7 +101,7 @@ void ADC_Handler(void) {
 	#endif
 
     int maxs[NUM_INPUTS] = {0,0,0,0};
-    int mins[NUM_INPUTS] = {2048,2048,2048,2048};
+    int mins[NUM_INPUTS] = {ADC_MAX,ADC_MAX,ADC_MAX,ADC_MAX};
 
     for (int i = 0; i < INP_BUFF; i++) {
       if (data[i] > maxs[i%NUM_INPUTS]){
