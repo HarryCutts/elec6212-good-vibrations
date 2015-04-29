@@ -40,6 +40,7 @@ def _get_mean_std_blocks(block):
     mic_stds = np.array(mic_stds)
     return np.mean(mic_stds, axis=0)
 
+
 def _last_flat_block(block):
     """Find the index of the last flat block"""
     mean_std = _get_mean_std_blocks(block)
@@ -52,6 +53,7 @@ def _last_flat_block(block):
     print(endIndex)
     return endIndex
 
+
 def _mean_of_flat(block):
     endIndex = _last_flat_block(block)
     averages = []
@@ -61,10 +63,11 @@ def _mean_of_flat(block):
     print(averages)
     return averages
 
+
 def _order_microphones(block):
     """Returns the block with the microphones
     sorted by their averages at their flattest point."""
-    averages = _mean_of_flat(block);
+    averages = _mean_of_flat(block)
     return block[np.argsort(averages)[::-1]]
 
 
