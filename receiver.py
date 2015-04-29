@@ -52,18 +52,20 @@ def _last_flat_block(block):
     print(endIndex)
     return endIndex
 
-def _order_microphones(block):
-    """Returns the block with the microphones
-    sorted by their averages at their flattest point."""
+def _mean_of_flat(block):
     endIndex = _last_flat_block(block)
     averages = []
     for b in block:
         m = np.mean(b[0:endIndex*(MEASUREMENTS_PER_BUFFER/STD_NUM_BLOCKS)])
         averages.append(m)
     print(averages)
+    return averages
 
-    averages = np.mean(block, axis=1)
-    return block[np.argsort(averages)]
+def _order_microphones(block):
+    """Returns the block with the microphones
+    sorted by their averages at their flattest point."""
+    averages = _mean_of_flat(block);
+    return block[np.argsort(averages)[::-1]]
 
 
 def _block_start_flat(block):
