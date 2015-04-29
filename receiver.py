@@ -99,6 +99,10 @@ def read_block(ser, with_filter=True):
     if with_filter:
         if _block_corrupted(block):
             print("Block corrupt")
+            ser.close()
+            time.sleep(1)
+            ser.open()
+            print("Serial Restarted")
             return None
 
         if not _block_start_flat(block):
