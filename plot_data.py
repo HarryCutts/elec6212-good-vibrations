@@ -45,19 +45,32 @@ print(data.mean(axis=1))
 plot_data(data)
 
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
-d1 = ax1.xcorr(data[0], data[2], usevlines=True, maxlags=None, normed=False, lw=2)
+ax1 = fig.add_subplot(311)
+d1 = ax1.xcorr(data[3], data[1], usevlines=True, maxlags=50, normed=False, lw=2)
 ax1.grid(True)
 ax1.axhline(0, color='black', lw=2)
-ax1 = fig.add_subplot(212)
-d2 = ax1.xcorr(data[1], data[3], usevlines=True, maxlags=None, normed=False, lw=2)
+ax1 = fig.add_subplot(312)
+d2 = ax1.xcorr(data[2], data[0], usevlines=True, maxlags=50, normed=False, lw=2)
+ax1.grid(True)
+ax1.axhline(0, color='black', lw=2)
+ax1 = fig.add_subplot(313)
+d3 = ax1.xcorr(data[1], data[3], usevlines=True, maxlags=50, normed=False, lw=2)
 ax1.grid(True)
 ax1.axhline(0, color='black', lw=2)
 plt.show()
 
 t1 = d1[0][np.argmax(np.absolute(d1[1]))]
 t2 = d2[0][np.argmax(np.absolute(d2[1]))]
+t3 = d3[0][np.argmax(np.absolute(d3[1]))]
+
+
 print(t1)
 print(t2)
+print(t3)
 
-print(math.atan2(t1, t2))
+if(abs(t1) >= abs(t2)):
+    angle = math.atan2(t1, t2)
+else:
+    angle = math.atan2(t2, t3) - math.pi/2
+
+print(math.degrees(angle))
