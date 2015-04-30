@@ -90,6 +90,16 @@ def _block_too_flat(block):
     return endIndex > STD_MAX_FLAT_BLOCKS
 
 
+def _extract_non_flat(block):
+    endIndex = _last_flat_block(block)
+
+    data = []
+    for b in block:
+        d = b[endIndex*(MEASUREMENTS_PER_BUFFER/STD_NUM_BLOCKS):]
+        data.append(d)
+    return data
+
+
 def read_block(ser, with_filter=True):
     block = [[] for i in range(NUM_INPUTS)]
     for y in range(MEASUREMENTS_PER_BUFFER):
@@ -119,7 +129,7 @@ def read_block(ser, with_filter=True):
     return _order_microphones(block)
 
 
-def get_data(port, num_blocks, with_filter=True):
+def get_data(port, num_blocks, with_filter=True, remove_flat=False):
     try:
         ser.setPort(port)
         ser.open()
@@ -132,6 +142,8 @@ def get_data(port, num_blocks, with_filter=True):
             while block is None:
                 print("Bad block")
                 block = read_block(ser, with_filter)
+            if remove_flat:
+                block = _extract_non_flat(block)
             data = np.concatenate((data, block), axis=1) if data is not None else block
 
         return data
