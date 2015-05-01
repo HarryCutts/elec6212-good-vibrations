@@ -50,7 +50,6 @@ def _last_flat_block(block):
             endIndex = endIndex + 1
         else:
             break
-    print(endIndex)
     return endIndex
 
 
@@ -60,7 +59,6 @@ def _mean_of_flat(block):
     for b in block:
         m = np.mean(b[0:endIndex*(MEASUREMENTS_PER_BUFFER/STD_NUM_BLOCKS)])
         averages.append(m)
-    print(averages)
     return averages
 
 
@@ -68,7 +66,8 @@ def _order_microphones(block):
     """Returns the block with the microphones
     sorted by their averages at their flattest point."""
     averages = _mean_of_flat(block)
-    return block[np.argsort(averages)[::-1]]
+    b = block[np.argsort(averages)[::-1]]
+    return b[(2,0,1,3),]
 
 
 def _block_start_flat(block):
@@ -129,7 +128,7 @@ def read_block(ser, with_filter=True):
     return _order_microphones(block)
 
 
-def get_data(port, num_blocks, with_filter=True, remove_flat=False):
+def get_data(port, num_blocks, with_filter=True):
     try:
         ser.setPort(port)
         ser.open()
@@ -142,8 +141,6 @@ def get_data(port, num_blocks, with_filter=True, remove_flat=False):
             while block is None:
                 print("Bad block")
                 block = read_block(ser, with_filter)
-            if remove_flat:
-                block = _extract_non_flat(block)
             data = np.concatenate((data, block), axis=1) if data is not None else block
 
         return data
