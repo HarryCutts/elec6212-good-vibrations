@@ -94,36 +94,20 @@ void write_uint16_t(uint16_t value) {
 unsigned long sampling_period_start;
 #endif
 
+int counter = 0;
+
 void ADC_Handler(void) {
   if ((adc_get_status(ADC) & ADC_ISR_RXBUFF) ==	ADC_ISR_RXBUFF) { // If the buffer is full
     #ifdef TIMING
 	Serial.println(micros() - sampling_period_start);
 	#endif
 
-    int maxs[NUM_INPUTS] = {0,0,0,0};
-    int mins[NUM_INPUTS] = {ADC_MAX,ADC_MAX,ADC_MAX,ADC_MAX};
-
-    for (int i = 0; i < INP_BUFF; i++) {
-      if (data[i] > maxs[i%NUM_INPUTS]){
-        maxs[i%NUM_INPUTS] = data[i];
-      }
-      if (data[i] < mins[i%NUM_INPUTS]){
-        mins[i%NUM_INPUTS] = data[i];
-      }
-    }
-
-    boolean rangeFlag = false;
-
-    for (int m = 0; m < NUM_INPUTS; m++){
-      if(maxs[m] - mins[m] > 100 ){
-        rangeFlag = true;
-      }
-    }
-
-    if (rangeFlag == true){
+	counter += 1;
+    if (counter == 10){
       for (int i = 0; i < INP_BUFF; i++) {
         write_uint16_t(data[i]);
       }
+	  counter = 0;
     }
 
     //set the next write
