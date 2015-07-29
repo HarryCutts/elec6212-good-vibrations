@@ -62,7 +62,7 @@ int main(void)
   glfwMakeContextCurrent(window);
   glfwSetKeyCallback(window, key_callback);
   glfwSetScrollCallback(window, scroll_callback);
-  //glClearColor(1.0, 1.0, 1.0, 0.0);
+  glClearColor(1.0, 1.0, 1.0, 0.0);
 
   print_settings();
 
@@ -98,7 +98,7 @@ int main(void)
     glPointSize(10.f);
     glLineWidth(2.f);
 
-    glColor3f(1.f, 1.f, 1.f);
+    glColor3f(0.f, 0.f, 0.f);
     glBegin(GL_POINTS);
     for (int i = 0; i < 4; ++i) {
       glVertex2f(mics[i][0], mics[i][1]);
